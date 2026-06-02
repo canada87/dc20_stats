@@ -60,7 +60,7 @@ jobs:
 
       - name: Build zip
         if: steps.tag_check.outputs.exists == 'false'
-        run: zip -r dc20_stats.zip module.json scripts/ templates/
+        run: zip -r dc20_stats.zip module.json scripts/ templates/ styles/
 
       - name: Create GitHub Release
         if: steps.tag_check.outputs.exists == 'false'

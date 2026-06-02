@@ -1,0 +1,68 @@
+.dc20_stats {
+  padding: 8px 12px 12px;
+  font-family: var(--font-primary);
+}
+.cs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid var(--color-border-light-tertiary);
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+}
+.cs-combat-name { font-size: 1.1em; font-weight: 600; }
+.cs-meta        { font-size: 0.85em; color: var(--color-text-light-6); }
+.cs-section-title {
+  margin: 10px 0 4px;
+  font-size: 0.9em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-light-6);
+}
+.cs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88em;
+}
+.cs-table thead th {
+  text-align: left;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--color-border-light-tertiary);
+  color: var(--color-text-light-6);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cs-table tbody tr:nth-child(even) { background: rgba(0,0,0,0.04); }
+.cs-table td { padding: 3px 6px; }
+.cs-name  { font-weight: 500; }
+.cs-type  { color: var(--color-text-light-6); font-size: 0.85em; }
+.cs-num   { text-align: right; font-variant-numeric: tabular-nums; }
+.cs-dealt  { color: #e44; }
+.cs-taken  { color: #c66; }
+.cs-healed { color: #4a4; }
+.cs-avg    { color: #888; }
+.cs-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border-light-tertiary);
+}
+.cs-summary-item  { display: flex; flex-direction: column; align-items: center; }
+.cs-label { font-size: 0.75em; color: var(--color-text-light-6); text-transform: uppercase; }
+.cs-value { font-size: 1.1em; font-weight: 600; }
+.cs-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+.cs-actions button {
+  padding: 4px 14px;
+  cursor: pointer;
+}
+.cs-empty {
+  color: var(--color-text-light-6);
+  text-align: center;
+  padding: 20px;
+}
