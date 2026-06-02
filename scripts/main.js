@@ -76,14 +76,19 @@ function onCreateChatMessage(msg) {
 
   // Card 1 – remember attacker for each target token so Card 2 can attribute correctly.
   if (isAttackCard(msg)) {
-    const source = { sourceActorId: msg.speaker.actor, sourceName: msg.speaker.alias };
-    extractTargetTokenIds(content).forEach(tid => pendingAttacks.set(tid, source));
+    const targets = extractTargetTokenIds(content);
+    const source  = { sourceActorId: msg.speaker.actor, sourceName: msg.speaker.alias };
+    targets.forEach(tid => pendingAttacks.set(tid, source));
+    console.debug(`${MODULE_ID} | Card1: attacker=${source.sourceName}, targets=[${targets.join(',')}]`);
     return;
   }
 
-  if (!isConfirmationMessage(content)) return;
+  const isConfirm = isConfirmationMessage(content);
+  console.debug(`${MODULE_ID} | msg ${msg.id}: isConfirm=${isConfirm}, hasRevertName=${content.includes('revert-name')}`);
+  if (!isConfirm) return;
 
   const parsed = parseConfirmation(content);
+  console.debug(`${MODULE_ID} | parsed:`, parsed, '| speaker:', msg.speaker.alias);
   if (!parsed) return;
 
   // Target = whoever the confirmation message was sent for (the one who took dmg/healing).
@@ -284,11 +289,19 @@ Hooks.once('ready', () => {
   Hooks.on('deleteChatMessage', onDeleteChatMessage);
 
   // Button in the combat tracker header.
+  // In Foundry v12 html is a plain HTMLElement, not jQuery — use native DOM.
   Hooks.on('renderCombatTracker', (_app, html) => {
     if (!game.combat) return;
-    const btn = $(`<a class="combat-control" title="Combat Statistics" style="font-size:1rem;"><i class="fa-solid fa-chart-bar"></i></a>`);
-    btn.on('click', openStatsDialog);
-    html.find('.combat-controls').prepend(btn);
+    const root     = html instanceof HTMLElement ? html : html[0];
+    const controls = root?.querySelector('.combat-controls');
+    if (!controls) return;
+    const btn = document.createElement('a');
+    btn.className = 'combat-control';
+    btn.title     = 'Combat Statistics';
+    btn.style.fontSize = '1rem';
+    btn.innerHTML = '<i class="fa-solid fa-chart-bar"></i>';
+    btn.addEventListener('click', openStatsDialog);
+    controls.prepend(btn);
   });
 
   // Expose to macros / console.
