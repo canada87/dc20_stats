@@ -42,7 +42,7 @@ jobs:
         if: steps.tag_check.outputs.exists == 'false'
         run: |
           jq \
-            --arg download "https://github.com/canada87/dc20-combat-stats/releases/download/${{ steps.vars.outputs.tag }}/dc20-combat-stats.zip" \
+            --arg download "https://github.com/canada87/dc20_stats/releases/download/${{ steps.vars.outputs.tag }}/dc20_stats.zip" \
             '.download = $download' \
             module.json > module.tmp.json
           mv module.tmp.json module.json
@@ -60,7 +60,7 @@ jobs:
 
       - name: Build zip
         if: steps.tag_check.outputs.exists == 'false'
-        run: zip -r dc20-combat-stats.zip module.json scripts/ templates/
+        run: zip -r dc20_stats.zip module.json scripts/ templates/
 
       - name: Create GitHub Release
         if: steps.tag_check.outputs.exists == 'false'
@@ -68,5 +68,5 @@ jobs:
         with:
           tag_name: ${{ steps.vars.outputs.tag }}
           name: "v${{ steps.vars.outputs.version }}"
-          files: dc20-combat-stats.zip
+          files: dc20_stats.zip
           generate_release_notes: true
