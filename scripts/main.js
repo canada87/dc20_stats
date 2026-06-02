@@ -121,7 +121,7 @@ function onCreateChatMessage(msg) {
   stats.messageMap[msg.id] = { ...parsed, targetActorId, sourceActorId };
 
   // Refresh dialog if open.
-  statsDialog?.rendered && statsDialog.render();
+  statsDialog?.rendered && statsDialog.render({});
 }
 
 function onDeleteChatMessage(msg) {
@@ -146,7 +146,7 @@ function onDeleteChatMessage(msg) {
   }
 
   delete stats.messageMap[msg.id];
-  statsDialog?.rendered && statsDialog.render();
+  statsDialog?.rendered && statsDialog.render({});
 }
 
 function onUpdateCombat(combat, changed) {
@@ -156,24 +156,24 @@ function onUpdateCombat(combat, changed) {
 
 // ── Dialog ────────────────────────────────────────────────────────────────────
 
-class CombatStatsDialog extends Application {
-  static get defaultOptions() {
-    return {
-      ...super.defaultOptions,
-      id: 'dc20-combat-stats-dialog',
-      title: 'DC20 — Combat Statistics',
-      template: `modules/${MODULE_ID}/templates/stats-dialog.hbs`,
-      width: 680,
-      height: 'auto',
-      resizable: true,
-    };
-  }
+const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
-  getData() {
+class CombatStatsDialog extends HandlebarsApplicationMixin(ApplicationV2) {
+  static DEFAULT_OPTIONS = {
+    id: 'dc20-combat-stats-dialog',
+    window: { title: 'DC20 — Combat Statistics', resizable: true },
+    position: { width: 680 },
+  };
+
+  static PARTS = {
+    main: { template: `modules/${MODULE_ID}/templates/stats-dialog.hbs` },
+  };
+
+  async _prepareContext(_options) {
     if (!stats) return { hasStats: false };
 
-    const all    = Object.values(stats.actors);
-    const party  = all.filter(a => a.type === 'character' || a.type === 'companion');
+    const all     = Object.values(stats.actors);
+    const party   = all.filter(a => a.type === 'character' || a.type === 'companion');
     const enemies = all.filter(a => a.type === 'npc');
     const rounds  = Math.max(1, stats.rounds);
 
@@ -200,9 +200,9 @@ class CombatStatsDialog extends Application {
     };
   }
 
-  activateListeners(html) {
-    super.activateListeners(html);
-    html.find('[data-action="export"]').on('click', () => exportToTxt());
+  _onRender(_context, _options) {
+    this.element.querySelector('[data-action="export"]')
+      ?.addEventListener('click', () => exportToTxt());
   }
 }
 
@@ -275,8 +275,8 @@ function exportToTxt() {
 let statsDialog = null;
 
 function openStatsDialog() {
-  if (!statsDialog || !statsDialog.rendered) statsDialog = new CombatStatsDialog();
-  statsDialog.render(true);
+  if (!statsDialog) statsDialog = new CombatStatsDialog();
+  statsDialog.render({ force: true });
 }
 
 Hooks.once('ready', () => {
