@@ -1,4 +1,4 @@
-const MODULE_ID = 'dc20-combat-stats';
+const MODULE_ID = 'dc20_stats';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
