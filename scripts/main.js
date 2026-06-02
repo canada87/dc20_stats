@@ -70,6 +70,7 @@ function extractTargetTokenIds(content) {
 // ── Hook handlers ─────────────────────────────────────────────────────────────
 
 function onCreateChatMessage(msg) {
+  console.log(`${MODULE_ID} | createChatMessage fired, stats=${!!stats}, flags=`, msg.flags);
   if (!stats) return;
 
   const content = msg.content ?? '';
@@ -79,16 +80,16 @@ function onCreateChatMessage(msg) {
     const targets = extractTargetTokenIds(content);
     const source  = { sourceActorId: msg.speaker.actor, sourceName: msg.speaker.alias };
     targets.forEach(tid => pendingAttacks.set(tid, source));
-    console.debug(`${MODULE_ID} | Card1: attacker=${source.sourceName}, targets=[${targets.join(',')}]`);
+    console.log(`${MODULE_ID} | Card1: attacker=${source.sourceName}, targets=[${targets.join(',')}]`);
     return;
   }
 
   const isConfirm = isConfirmationMessage(content);
-  console.debug(`${MODULE_ID} | msg ${msg.id}: isConfirm=${isConfirm}, hasRevertName=${content.includes('revert-name')}`);
+  console.log(`${MODULE_ID} | msg ${msg.id}: isConfirm=${isConfirm}, hasRevertName=${content.includes('revert-name')}`);
   if (!isConfirm) return;
 
   const parsed = parseConfirmation(content);
-  console.debug(`${MODULE_ID} | parsed:`, parsed, '| speaker:', msg.speaker.alias);
+  console.log(`${MODULE_ID} | parsed:`, parsed, '| speaker:', msg.speaker.alias);
   if (!parsed) return;
 
   // Target = whoever the confirmation message was sent for (the one who took dmg/healing).
