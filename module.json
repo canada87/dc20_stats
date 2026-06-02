@@ -1,0 +1,18 @@
+{
+  "id": "dc20-combat-stats",
+  "title": "DC20 Combat Statistics",
+  "description": "Tracks per-actor damage and healing statistics during combat for the DC20 RPG system.",
+  "version": "1.0.0",
+  "compatibility": {
+    "minimum": "11",
+    "verified": "12"
+  },
+  "authors": [
+    {
+      "name": "Andrea Jacassi",
+      "email": "andrea.jacassi@xautomata.com"
+    }
+  ],
+  "esmodules": ["scripts/main.js"],
+  "flags": {}
+}
