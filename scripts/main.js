@@ -310,5 +310,28 @@ Hooks.once('ready', () => {
     open:     openStatsDialog,
     export:   exportToTxt,
     getStats: () => stats,
+    diagnose: () => {
+      const s = stats;
+      const lastMsgs = game.messages.contents.slice(-5).map(m => ({
+        id:          m.id,
+        speaker:     m.speaker?.alias,
+        hasItemFlag: !!m.flags?.dc20rpg?.itemId,
+        hasRevert:   m.content?.includes('revert-name'),
+        matchDmg:    m.content?.match(/Took\s+(\d+)\s+damage/i)?.[0] ?? null,
+        matchHeal:   m.content?.match(/Received\s+(\d+)\s+health/i)?.[0] ?? null,
+      }));
+      const report = {
+        statsActive:   !!s,
+        combatId:      s?.combatId,
+        combatActive:  !!game.combat,
+        combatMatch:   game.combat?.id === s?.combatId,
+        rounds:        s?.rounds,
+        actorCount:    Object.keys(s?.actors ?? {}).length,
+        pendingCount:  pendingAttacks.size,
+        lastMessages:  lastMsgs,
+      };
+      console.log('=== dc20_stats diagnose ===\n' + JSON.stringify(report, null, 2));
+      return report;
+    },
   };
 });
