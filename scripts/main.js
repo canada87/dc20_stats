@@ -155,6 +155,46 @@ function onUpdateCombat(combat, changed) {
   if (changed.round !== undefined) stats.rounds = changed.round;
 }
 
+// DC20 creates Card 2 with minimal content then updates it with the full confirmation HTML.
+// We must hook updateChatMessage to catch the revert-name content when it arrives.
+function onUpdateChatMessage(msg, changes) {
+  if (!stats) return;
+  if (!changes.content) return;
+  if (stats.messageMap[msg.id]) return; // already recorded from createChatMessage
+
+  const content = changes.content;
+  console.log(`${MODULE_ID} | updateChatMessage ${msg.id}: hasRevert=${content.includes('revert-name')}`);
+  if (!isConfirmationMessage(content)) return;
+
+  const parsed = parseConfirmation(content);
+  console.log(`${MODULE_ID} | updateChatMessage parsed:`, parsed, '| speaker:', msg.speaker.alias);
+  if (!parsed) return;
+
+  const targetActorId = msg.speaker.actor;
+  const targetActor   = game.actors.get(targetActorId);
+  if (!targetActor || targetActor.type === 'storage') return;
+
+  const pending       = pendingAttacks.get(msg.speaker.token);
+  const sourceActorId = pending?.sourceActorId ?? game.combat?.combatant?.actorId;
+  const sourceName    = pending?.sourceName    ?? game.combat?.combatant?.name;
+
+  const targetEntry = getOrCreateActor(targetActorId, msg.speaker.alias, targetActor.type);
+  if (parsed.type === 'damage') targetEntry.damageTaken     += parsed.amount;
+  else                          targetEntry.healingReceived += parsed.amount;
+
+  if (sourceActorId) {
+    const sourceActor = game.actors.get(sourceActorId);
+    if (sourceActor && sourceActor.type !== 'storage') {
+      const sourceActorEntry = getOrCreateActor(sourceActorId, sourceName, sourceActor.type);
+      if (parsed.type === 'damage') sourceActorEntry.damageDealt += parsed.amount;
+      else                          sourceActorEntry.healingDone += parsed.amount;
+    }
+  }
+
+  stats.messageMap[msg.id] = { ...parsed, targetActorId, sourceActorId };
+  statsDialog?.rendered && statsDialog.render({});
+}
+
 // ── Dialog ────────────────────────────────────────────────────────────────────
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -287,6 +327,7 @@ Hooks.once('ready', () => {
   Hooks.on('deleteCombat',      combat           => { if (stats?.combatId === combat.id) openStatsDialog(); });
   Hooks.on('updateCombat',      onUpdateCombat);
   Hooks.on('createChatMessage', onCreateChatMessage);
+  Hooks.on('updateChatMessage', onUpdateChatMessage);
   Hooks.on('deleteChatMessage', onDeleteChatMessage);
 
   // Button in the combat tracker header.
