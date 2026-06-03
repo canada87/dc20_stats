@@ -6,16 +6,19 @@ let stats = null;
 const pendingAttacks = new Map();
 let selectedCombatListIdx = 0;
 
+// In-memory cache — always in sync with the setting.
+// Using a cache avoids the async race where game.settings.get() returns stale
+// data immediately after game.settings.set().
+let cachedHistory = [];
+
 // ── History persistence ───────────────────────────────────────────────────────
 
 function loadHistory() {
-  try {
-    const data = game.settings.get(MODULE_ID, 'combatHistory');
-    return Array.isArray(data?.combats) ? data.combats : [];
-  } catch { return []; }
+  return cachedHistory;
 }
 
 function saveHistory(combats) {
+  cachedHistory = combats;
   game.settings.set(MODULE_ID, 'combatHistory', { combats });
 }
 
@@ -331,11 +334,11 @@ class CombatStatsDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     this.element.querySelectorAll('[data-delete-history-idx]').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
-        const hIdx   = parseInt(btn.dataset.deleteHistoryIdx);
-        const history = loadHistory();
-        history.splice(hIdx, 1);
-        saveHistory(history);
-        const newLen = (stats ? 1 : 0) + history.length;
+        const hIdx      = parseInt(btn.dataset.deleteHistoryIdx);
+        const newHistory = [...cachedHistory];
+        newHistory.splice(hIdx, 1);
+        saveHistory(newHistory);
+        const newLen = (stats ? 1 : 0) + newHistory.length;
         if (selectedCombatListIdx >= newLen) selectedCombatListIdx = Math.max(0, newLen - 1);
         this.render({});
       });
@@ -362,6 +365,11 @@ Hooks.once('ready', () => {
     type: Object,
     default: { combats: [] },
   });
+  // Seed the in-memory cache from the persisted setting.
+  try {
+    const stored = game.settings.get(MODULE_ID, 'combatHistory');
+    cachedHistory = Array.isArray(stored?.combats) ? stored.combats : [];
+  } catch { cachedHistory = []; }
 
   Hooks.on('combatStart', combat => {
     resetStats(combat);
@@ -372,11 +380,11 @@ Hooks.once('ready', () => {
     if (!stats || stats.combatId !== combat.id) return;
     const record = { ...stats, date: new Date().toISOString() };
     delete record.messageMap;
-    const history = [record, ...loadHistory()].slice(0, 30);
-    saveHistory(history);
+    saveHistory([record, ...cachedHistory].slice(0, 30));
     stats = null;
     selectedCombatListIdx = 0;
-    openStatsDialog();
+    // Only open automatically for the GM.
+    if (game.user.isGM) openStatsDialog();
   });
 
   Hooks.on('updateCombat',      onUpdateCombat);
@@ -403,7 +411,7 @@ Hooks.once('ready', () => {
     open:        openStatsDialog,
     getStats:    () => stats,
     getHistory:  () => loadHistory(),
-    clearHistory: () => { saveHistory([]); ui.notifications.info('DC20 Stats: history cleared.'); },
+    clearHistory: () => { saveHistory([]); statsDialog?.rendered && statsDialog.render({}); ui.notifications.info('DC20 Stats: history cleared.'); },
     diagnose: () => {
       const s = stats;
       const history = loadHistory();
