@@ -31,6 +31,7 @@ function getOrCreateActor(actorId, fallbackName, fallbackType) {
       hitsLanded: 0,
       timesHit: 0,
       damageDealt: 0,
+      maxSingleHit: 0,
       damageTaken: 0,
       healingDone: 0,
       healingReceived: 0,
@@ -193,6 +194,7 @@ function processConfirmationContent(msg, content) {
       if (parsed.type === 'damage') {
         sourceActorEntry.damageDealt += parsed.amount;
         sourceActorEntry.hitsLanded++;
+        if (parsed.amount > sourceActorEntry.maxSingleHit) sourceActorEntry.maxSingleHit = parsed.amount;
       } else {
         sourceActorEntry.healingDone += parsed.amount;
       }
@@ -201,6 +203,36 @@ function processConfirmationContent(msg, content) {
 
   stats.messageMap[msg.id] = { eventType: 'confirm', ...parsed, targetActorId, sourceActorId };
   statsDialog?.rendered && statsDialog.render({});
+}
+
+// ── Awards ────────────────────────────────────────────────────────────────────
+
+function computeAwards(all) {
+  const withPos = (actors, key) => actors.filter(a => (a[key] ?? 0) > 0);
+  const topBy   = (list, key)   => list.length ? list.reduce((b, a) => a[key] > b[key] ? a : b) : null;
+
+  const awards = [];
+
+  const dps = topBy(withPos(all, 'damageDealt'), 'damageDealt');
+  if (dps) awards.push({ icon: 'fa-fire',           label: 'Top DPS',          name: dps.name,    value: dps.damageDealt });
+
+  const bigHit = topBy(withPos(all, 'maxSingleHit'), 'maxSingleHit');
+  if (bigHit) awards.push({ icon: 'fa-bolt',        label: 'Hardest Hit',      name: bigHit.name, value: bigHit.maxSingleHit });
+
+  const healer = topBy(withPos(all, 'healingDone'), 'healingDone');
+  if (healer) awards.push({ icon: 'fa-heart',       label: 'Best Healer',      name: healer.name, value: healer.healingDone });
+
+  const hitter = topBy(withPos(all, 'hitsLanded'), 'hitsLanded');
+  if (hitter) awards.push({ icon: 'fa-bullseye',    label: 'Most Hits',        name: hitter.name, value: hitter.hitsLanded });
+
+  const missMap = all.map(a => ({ name: a.name, misses: Math.max(0, a.attacksMade - a.hitsLanded) }));
+  const misser  = topBy(missMap.filter(a => a.misses > 0), 'misses');
+  if (misser) awards.push({ icon: 'fa-ban',         label: 'Most Misses',      name: misser.name, value: misser.misses });
+
+  const tanker = topBy(withPos(all, 'damageTaken'), 'damageTaken');
+  if (tanker) awards.push({ icon: 'fa-shield-halved', label: 'Most Dmg Taken', name: tanker.name, value: tanker.damageTaken });
+
+  return awards;
 }
 
 // ── Dialog ────────────────────────────────────────────────────────────────────
@@ -230,6 +262,8 @@ class CombatStatsDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     const totalTaken   = party.reduce((s, a) => s + a.damageTaken,   0);
     const totalHealing = party.reduce((s, a) => s + a.healingDone,   0);
 
+    const awards = computeAwards(all);
+
     return {
       hasStats: true,
       name:     stats.name,
@@ -247,6 +281,8 @@ class CombatStatsDialog extends HandlebarsApplicationMixin(ApplicationV2) {
         totalHealing,
         avgDmgPerEnemy: enemies.length ? (totalDealt / enemies.length).toFixed(1) : '—',
       },
+      awards,
+      hasAwards: awards.length > 0,
     };
   }
 
@@ -316,6 +352,13 @@ function exportToTxt() {
   lines.push(`Total damage taken by party : ${totalTaken}`);
   lines.push(`Total healing done by party : ${totalHealing}`);
   lines.push(`Avg damage per enemy        : ${enemies.length ? (totalDealt / enemies.length).toFixed(1) : '—'}`);
+
+  const awards = computeAwards(all);
+  if (awards.length) {
+    lines.push('');
+    lines.push('--- AWARDS ------------------------------------------------------');
+    awards.forEach(a => lines.push(`${col(a.label, 22)}: ${a.name} (${a.value})`));
+  }
 
   const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
   const url  = URL.createObjectURL(blob);

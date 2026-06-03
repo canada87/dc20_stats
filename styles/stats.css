@@ -54,6 +54,45 @@
 .cs-summary-item  { display: flex; flex-direction: column; align-items: center; }
 .cs-label { font-size: 0.75em; color: var(--color-text-light-6); text-transform: uppercase; }
 .cs-value { font-size: 1.1em; font-weight: 600; }
+.cs-awards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.cs-award {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 10px;
+  background: rgba(0,0,0,0.06);
+  border-radius: 4px;
+  border: 1px solid var(--color-border-light-tertiary);
+  flex: 1;
+  min-width: 90px;
+}
+.cs-award-icon {
+  font-size: 1.1em;
+  color: #c8a000;
+  margin-bottom: 2px;
+}
+.cs-award-label {
+  font-size: 0.68em;
+  color: var(--color-text-light-6);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+.cs-award-name {
+  font-weight: 600;
+  font-size: 0.88em;
+  text-align: center;
+  margin-top: 2px;
+}
+.cs-award-value {
+  font-size: 0.82em;
+  color: var(--color-text-light-6);
+}
 .cs-actions {
   margin-top: 12px;
   display: flex;

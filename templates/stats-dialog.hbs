@@ -83,6 +83,20 @@
       </div>
     </div>
 
+    {{#if hasAwards}}
+    <h3 class="cs-section-title">Awards</h3>
+    <div class="cs-awards">
+      {{#each awards}}
+      <div class="cs-award">
+        <span class="cs-award-icon"><i class="fa-solid {{icon}}"></i></span>
+        <span class="cs-award-label">{{label}}</span>
+        <span class="cs-award-name">{{name}}</span>
+        <span class="cs-award-value">{{value}}</span>
+      </div>
+      {{/each}}
+    </div>
+    {{/if}}
+
     <div class="cs-actions">
       <button data-action="export">
         <i class="fa-solid fa-file-lines"></i> Export TXT
