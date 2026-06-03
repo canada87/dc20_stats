@@ -5,7 +5,6 @@ const MODULE_ID = 'dc20_stats';
 let stats = null;
 
 // targetTokenId → { sourceActorId, sourceName }
-// Populated from attack cards (Card 1) so Card 2 can attribute damage to the attacker.
 const pendingAttacks = new Map();
 
 // ── Stats helpers ─────────────────────────────────────────────────────────────
@@ -15,8 +14,8 @@ function resetStats(combat) {
     combatId: combat.id,
     name: combat.name || 'Combat',
     rounds: combat.round ?? 0,
-    actors: {},      // actorId → ActorEntry
-    messageMap: {},  // messageId → recorded event (for revert support)
+    actors: {},
+    messageMap: {},
   };
   pendingAttacks.clear();
 }
@@ -28,6 +27,9 @@ function getOrCreateActor(actorId, fallbackName, fallbackType) {
       id: actorId,
       name: actor?.name ?? fallbackName ?? 'Unknown',
       type: actor?.type ?? fallbackType ?? 'unknown',
+      attacksMade: 0,
+      hitsLanded: 0,
+      timesHit: 0,
       damageDealt: 0,
       damageTaken: 0,
       healingDone: 0,
@@ -39,13 +41,10 @@ function getOrCreateActor(actorId, fallbackName, fallbackType) {
 
 // ── Message parsing ───────────────────────────────────────────────────────────
 
-// Card 1: attack/spell card sent by the attacker, has DC20 item flags and target data.
 function isAttackCard(msg) {
   return !!msg.flags?.dc20rpg?.itemId;
 }
 
-// Card 2: the confirmation message after damage/healing is applied.
-// DC20 always adds the 'revert-name' CSS class to these messages.
 function isConfirmationMessage(content) {
   return content.includes('revert-name');
 }
@@ -60,8 +59,6 @@ function parseConfirmation(content) {
   return null;
 }
 
-// Extract all unique target token IDs from the attack card HTML.
-// DC20 puts data-target="TOKEN_ID" on the apply-damage buttons.
 function extractTargetTokenIds(content) {
   const matches = [...content.matchAll(/data-target="([^"#]+)"/g)];
   return [...new Set(matches.map(m => m[1]))];
@@ -75,11 +72,22 @@ function onCreateChatMessage(msg) {
 
   const content = msg.content ?? '';
 
-  // Card 1 – remember attacker for each target token so Card 2 can attribute correctly.
   if (isAttackCard(msg)) {
-    const targets = extractTargetTokenIds(content);
-    const source  = { sourceActorId: msg.speaker.actor, sourceName: msg.speaker.alias };
+    const targets      = extractTargetTokenIds(content);
+    const sourceActorId = msg.speaker.actor;
+    const source        = { sourceActorId, sourceName: msg.speaker.alias };
     targets.forEach(tid => pendingAttacks.set(tid, source));
+
+    // Track attack roll for the attacker.
+    if (sourceActorId) {
+      const sourceActor = game.actors.get(sourceActorId);
+      if (sourceActor && sourceActor.type !== 'storage') {
+        const entry = getOrCreateActor(sourceActorId, msg.speaker.alias, sourceActor.type);
+        entry.attacksMade++;
+        stats.messageMap[msg.id] = { eventType: 'attack', sourceActorId };
+      }
+    }
+
     console.log(`${MODULE_ID} | Card1: attacker=${source.sourceName}, targets=[${targets.join(',')}]`);
     return;
   }
@@ -88,9 +96,6 @@ function onCreateChatMessage(msg) {
   console.log(`${MODULE_ID} | msg ${msg.id}: isConfirm=${isConfirm}, hasRevertName=${content.includes('revert-name')}`);
   if (!isConfirm) return;
 
-  // processConfirmationContent handles the rest; renderChatMessage is the primary path
-  // for DC20 which updates message content after creation, but try here too in case
-  // the full content is already present at createChatMessage time.
   processConfirmationContent(msg, content);
 }
 
@@ -99,19 +104,32 @@ function onDeleteChatMessage(msg) {
   const record = stats.messageMap[msg.id];
   if (!record) return;
 
-  const { type, amount, targetActorId, sourceActorId } = record;
+  if (record.eventType === 'attack') {
+    const source = stats.actors[record.sourceActorId];
+    if (source) source.attacksMade = Math.max(0, source.attacksMade - 1);
+  } else {
+    const { type, amount, targetActorId, sourceActorId } = record;
 
-  const target = stats.actors[targetActorId];
-  if (target) {
-    if (type === 'damage') target.damageTaken     = Math.max(0, target.damageTaken     - amount);
-    else                   target.healingReceived = Math.max(0, target.healingReceived - amount);
-  }
+    const target = stats.actors[targetActorId];
+    if (target) {
+      if (type === 'damage') {
+        target.damageTaken = Math.max(0, target.damageTaken - amount);
+        target.timesHit    = Math.max(0, target.timesHit - 1);
+      } else {
+        target.healingReceived = Math.max(0, target.healingReceived - amount);
+      }
+    }
 
-  if (sourceActorId) {
-    const source = stats.actors[sourceActorId];
-    if (source) {
-      if (type === 'damage') source.damageDealt = Math.max(0, source.damageDealt - amount);
-      else                   source.healingDone = Math.max(0, source.healingDone - amount);
+    if (sourceActorId) {
+      const source = stats.actors[sourceActorId];
+      if (source) {
+        if (type === 'damage') {
+          source.damageDealt = Math.max(0, source.damageDealt - amount);
+          source.hitsLanded  = Math.max(0, source.hitsLanded - 1);
+        } else {
+          source.healingDone = Math.max(0, source.healingDone - amount);
+        }
+      }
     }
   }
 
@@ -124,11 +142,7 @@ function onUpdateCombat(combat, changed) {
   if (changed.round !== undefined) stats.rounds = changed.round;
 }
 
-// DC20 creates Card 2 with minimal content then updates it with the full confirmation HTML.
-// updateChatMessage may not fire reliably; renderChatMessage fires after every render/re-render
-// and gives us the document with its current (final) content via msg.content.
 function onUpdateChatMessage(msg, changes) {
-  // Diagnostic: log unconditionally to confirm hook fires at all.
   console.log(`${MODULE_ID} | updateChatMessage ${msg.id}, changeKeys=${Object.keys(changes).join(',')}`);
   if (!stats) return;
   if (stats.messageMap[msg.id]) return;
@@ -137,8 +151,8 @@ function onUpdateChatMessage(msg, changes) {
   processConfirmationContent(msg, content);
 }
 
-// renderChatMessage fires after every render, including after DC20 updates the content.
-// At that point msg.content already holds the final HTML.
+// renderChatMessage fires after every render, including after DC20 updates message content.
+// msg.content holds the final HTML at this point.
 function onRenderChatMessage(msg) {
   if (!stats) return;
   if (stats.messageMap[msg.id]) return;
@@ -164,19 +178,28 @@ function processConfirmationContent(msg, content) {
   console.log(`${MODULE_ID} | processConfirmation: target=${targetActor.name}(${targetActor.type}), source=${sourceName}`);
 
   const targetEntry = getOrCreateActor(targetActorId, msg.speaker.alias, targetActor.type);
-  if (parsed.type === 'damage') targetEntry.damageTaken     += parsed.amount;
-  else                          targetEntry.healingReceived += parsed.amount;
+  if (parsed.type === 'damage') {
+    targetEntry.damageTaken += parsed.amount;
+    targetEntry.timesHit++;
+  } else {
+    targetEntry.healingReceived += parsed.amount;
+  }
 
+  let sourceActorEntry = null;
   if (sourceActorId) {
     const sourceActor = game.actors.get(sourceActorId);
     if (sourceActor && sourceActor.type !== 'storage') {
-      const sourceActorEntry = getOrCreateActor(sourceActorId, sourceName, sourceActor.type);
-      if (parsed.type === 'damage') sourceActorEntry.damageDealt += parsed.amount;
-      else                          sourceActorEntry.healingDone += parsed.amount;
+      sourceActorEntry = getOrCreateActor(sourceActorId, sourceName, sourceActor.type);
+      if (parsed.type === 'damage') {
+        sourceActorEntry.damageDealt += parsed.amount;
+        sourceActorEntry.hitsLanded++;
+      } else {
+        sourceActorEntry.healingDone += parsed.amount;
+      }
     }
   }
 
-  stats.messageMap[msg.id] = { ...parsed, targetActorId, sourceActorId };
+  stats.messageMap[msg.id] = { eventType: 'confirm', ...parsed, targetActorId, sourceActorId };
   statsDialog?.rendered && statsDialog.render({});
 }
 
@@ -188,7 +211,7 @@ class CombatStatsDialog extends HandlebarsApplicationMixin(ApplicationV2) {
   static DEFAULT_OPTIONS = {
     id: 'dc20-combat-stats-dialog',
     window: { title: 'DC20 — Combat Statistics', resizable: true },
-    position: { width: 680 },
+    position: { width: 740 },
   };
 
   static PARTS = {
@@ -213,11 +236,12 @@ class CombatStatsDialog extends HandlebarsApplicationMixin(ApplicationV2) {
       rounds:   stats.rounds,
       party: party.map(a => ({
         ...a,
+        misses:        Math.max(0, a.attacksMade - a.hitsLanded),
         avgDmgPerRound: (a.damageDealt / rounds).toFixed(1),
       })),
       enemies,
       summary: {
-        enemyCount:    enemies.length,
+        enemyCount:     enemies.length,
         totalDealt,
         totalTaken,
         totalHealing,
@@ -256,16 +280,22 @@ function exportToTxt() {
   lines.push('');
 
   lines.push('--- PARTY -------------------------------------------------------');
-  lines.push(col('Name', 22) + col('Type', 12) + col('Dmg Dealt', 12) + col('Avg/Round', 12) + col('Dmg Taken', 12) + col('Healed', 10) + 'Recv. Heal');
-  lines.push('-'.repeat(92));
+  lines.push(
+    col('Name', 22) + col('Atk', 6) + col('Hits', 6) + col('Miss', 6) +
+    col('Dmg Dealt', 11) + col('Avg/Rnd', 9) + col('Dmg Taken', 11) +
+    col('Healed', 9) + 'Recv.Heal'
+  );
+  lines.push('-'.repeat(106));
   party.forEach(a => {
     lines.push(
       col(a.name, 22) +
-      col(a.type, 12) +
-      col(a.damageDealt, 12) +
-      col((a.damageDealt / rounds).toFixed(1), 12) +
-      col(a.damageTaken, 12) +
-      col(a.healingDone, 10) +
+      col(a.attacksMade, 6) +
+      col(a.hitsLanded, 6) +
+      col(Math.max(0, a.attacksMade - a.hitsLanded), 6) +
+      col(a.damageDealt, 11) +
+      col((a.damageDealt / rounds).toFixed(1), 9) +
+      col(a.damageTaken, 11) +
+      col(a.healingDone, 9) +
       a.healingReceived
     );
   });
@@ -273,10 +303,10 @@ function exportToTxt() {
   if (enemies.length) {
     lines.push('');
     lines.push('--- ENEMIES -----------------------------------------------------');
-    lines.push(col('Name', 34) + col('Dmg Taken', 12) + 'Recv. Heal');
-    lines.push('-'.repeat(58));
+    lines.push(col('Name', 30) + col('Times Hit', 11) + col('Dmg Taken', 11) + 'Recv.Heal');
+    lines.push('-'.repeat(63));
     enemies.forEach(a => {
-      lines.push(col(a.name, 34) + col(a.damageTaken, 12) + a.healingReceived);
+      lines.push(col(a.name, 30) + col(a.timesHit, 11) + col(a.damageTaken, 11) + a.healingReceived);
     });
   }
 
@@ -308,16 +338,14 @@ function openStatsDialog() {
 Hooks.once('ready', () => {
   console.log(`${MODULE_ID} | ready`);
 
-  Hooks.on('combatStart',       combat           => { resetStats(combat); ui.notifications.info('DC20 Stats: tracking started.'); });
-  Hooks.on('deleteCombat',      combat           => { if (stats?.combatId === combat.id) openStatsDialog(); });
+  Hooks.on('combatStart',       combat => { resetStats(combat); ui.notifications.info('DC20 Stats: tracking started.'); });
+  Hooks.on('deleteCombat',      combat => { if (stats?.combatId === combat.id) openStatsDialog(); });
   Hooks.on('updateCombat',      onUpdateCombat);
   Hooks.on('createChatMessage', onCreateChatMessage);
   Hooks.on('updateChatMessage', onUpdateChatMessage);
   Hooks.on('renderChatMessage', onRenderChatMessage);
   Hooks.on('deleteChatMessage', onDeleteChatMessage);
 
-  // Button in the combat tracker header.
-  // In Foundry v12 html is a plain HTMLElement, not jQuery — use native DOM.
   Hooks.on('renderCombatTracker', (_app, html) => {
     if (!game.combat) return;
     const root     = html instanceof HTMLElement ? html : html[0];
@@ -332,7 +360,6 @@ Hooks.once('ready', () => {
     controls.prepend(btn);
   });
 
-  // Expose to macros / console.
   game.dc20CombatStats = {
     open:     openStatsDialog,
     export:   exportToTxt,
@@ -354,6 +381,11 @@ Hooks.once('ready', () => {
         combatMatch:   game.combat?.id === s?.combatId,
         rounds:        s?.rounds,
         actorCount:    Object.keys(s?.actors ?? {}).length,
+        actors:        s ? Object.values(s.actors).map(a => ({
+          name: a.name, type: a.type,
+          atk: a.attacksMade, hits: a.hitsLanded, miss: Math.max(0, a.attacksMade - a.hitsLanded),
+          dmgDealt: a.damageDealt, dmgTaken: a.damageTaken,
+        })) : [],
         pendingCount:  pendingAttacks.size,
         lastMessages:  lastMsgs,
       };

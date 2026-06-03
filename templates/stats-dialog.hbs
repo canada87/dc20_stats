@@ -12,19 +12,23 @@
       <thead>
         <tr>
           <th>Name</th>
-          <th>Type</th>
+          <th title="Attack rolls made">Atk</th>
+          <th title="Damage confirmations landed">Hits</th>
+          <th title="Attacks that did not result in damage">Miss</th>
           <th title="Total damage dealt">Dmg Dealt</th>
-          <th title="Average damage per round">Avg/Round</th>
+          <th title="Average damage per round">Avg/Rnd</th>
           <th title="Total damage taken">Dmg Taken</th>
           <th title="Healing provided to others">Healed</th>
-          <th title="Healing received">Recv. Heal</th>
+          <th title="Healing received">Recv.Heal</th>
         </tr>
       </thead>
       <tbody>
         {{#each party}}
         <tr>
           <td class="cs-name">{{name}}</td>
-          <td class="cs-type">{{type}}</td>
+          <td class="cs-num">{{attacksMade}}</td>
+          <td class="cs-num cs-hit">{{hitsLanded}}</td>
+          <td class="cs-num cs-miss">{{misses}}</td>
           <td class="cs-num cs-dealt">{{damageDealt}}</td>
           <td class="cs-num cs-avg">{{avgDmgPerRound}}</td>
           <td class="cs-num cs-taken">{{damageTaken}}</td>
@@ -42,14 +46,16 @@
       <thead>
         <tr>
           <th>Name</th>
+          <th title="Number of times hit by the party">Times Hit</th>
           <th title="Damage taken from party">Dmg Taken</th>
-          <th title="Healing received">Recv. Heal</th>
+          <th title="Healing received">Recv.Heal</th>
         </tr>
       </thead>
       <tbody>
         {{#each enemies}}
         <tr>
           <td class="cs-name">{{name}}</td>
+          <td class="cs-num cs-hit">{{timesHit}}</td>
           <td class="cs-num cs-taken">{{damageTaken}}</td>
           <td class="cs-num">{{healingReceived}}</td>
         </tr>

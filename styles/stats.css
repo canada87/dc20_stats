@@ -40,6 +40,8 @@
 .cs-dealt  { color: #e44; }
 .cs-taken  { color: #c66; }
 .cs-healed { color: #4a4; }
+.cs-hit    { color: #4a4; }
+.cs-miss   { color: #c66; }
 .cs-avg    { color: #888; }
 .cs-summary {
   display: flex;
