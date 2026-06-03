@@ -1,107 +1,144 @@
 <div class="dc20_stats">
-  {{#if hasStats}}
+  {{#if hasData}}
 
-    <div class="cs-header">
-      <span class="cs-combat-name">{{name}}</span>
-      <span class="cs-meta">Round {{rounds}} &nbsp;|&nbsp; {{summary.enemyCount}} {{#if (eq summary.enemyCount 1)}}enemy{{else}}enemies{{/if}}</span>
-    </div>
+    <div class="cs-layout">
 
-    {{#if party.length}}
-    <h3 class="cs-section-title">Party</h3>
-    <table class="cs-table">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th title="Attack rolls made">Atk</th>
-          <th title="Damage confirmations landed">Hits</th>
-          <th title="Attacks that did not result in damage">Miss</th>
-          <th title="Total damage dealt">Dmg Dealt</th>
-          <th title="Average damage per round">Avg/Rnd</th>
-          <th title="Total damage taken">Dmg Taken</th>
-          <th title="Healing provided to others">Healed</th>
-          <th title="Healing received">Recv.Heal</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{#each party}}
-        <tr>
-          <td class="cs-name">{{name}}</td>
-          <td class="cs-num">{{attacksMade}}</td>
-          <td class="cs-num cs-hit">{{hitsLanded}}</td>
-          <td class="cs-num cs-miss">{{misses}}</td>
-          <td class="cs-num cs-dealt">{{damageDealt}}</td>
-          <td class="cs-num cs-avg">{{avgDmgPerRound}}</td>
-          <td class="cs-num cs-taken">{{damageTaken}}</td>
-          <td class="cs-num cs-healed">{{healingDone}}</td>
-          <td class="cs-num">{{healingReceived}}</td>
-        </tr>
+      {{!-- Sidebar: combat history list --}}
+      <div class="cs-sidebar">
+        {{#each combatList}}
+        <div class="cs-combat-item {{#if isSelected}}cs-selected{{/if}}"
+             data-list-idx="{{listIdx}}">
+          <span class="cs-combat-item-name">{{name}}</span>
+          {{#if date}}<span class="cs-combat-item-date">{{date}}</span>{{/if}}
+          {{#if canDelete}}
+          <button class="cs-combat-delete" data-delete-history-idx="{{historyIdx}}" title="Delete combat">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+          {{/if}}
+        </div>
         {{/each}}
-      </tbody>
-    </table>
-    {{/if}}
+      </div>
 
-    {{#if enemies.length}}
-    <h3 class="cs-section-title">Enemies</h3>
-    <table class="cs-table">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th title="Number of times hit by the party">Times Hit</th>
-          <th title="Damage taken from party">Dmg Taken</th>
-          <th title="Healing received">Recv.Heal</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{#each enemies}}
-        <tr>
-          <td class="cs-name">{{name}}</td>
-          <td class="cs-num cs-hit">{{timesHit}}</td>
-          <td class="cs-num cs-taken">{{damageTaken}}</td>
-          <td class="cs-num">{{healingReceived}}</td>
-        </tr>
-        {{/each}}
-      </tbody>
-    </table>
-    {{/if}}
+      {{!-- Main panel: selected combat stats --}}
+      <div class="cs-main">
 
-    <div class="cs-summary">
-      <div class="cs-summary-item">
-        <span class="cs-label">Total Dmg Dealt</span>
-        <span class="cs-value cs-dealt">{{summary.totalDealt}}</span>
-      </div>
-      <div class="cs-summary-item">
-        <span class="cs-label">Total Dmg Taken</span>
-        <span class="cs-value cs-taken">{{summary.totalTaken}}</span>
-      </div>
-      <div class="cs-summary-item">
-        <span class="cs-label">Total Healing</span>
-        <span class="cs-value cs-healed">{{summary.totalHealing}}</span>
-      </div>
-      <div class="cs-summary-item">
-        <span class="cs-label">Avg Dmg / Enemy</span>
-        <span class="cs-value">{{summary.avgDmgPerEnemy}}</span>
-      </div>
-    </div>
+        <div class="cs-header">
+          <span class="cs-combat-name">{{combat.name}}</span>
+          <span class="cs-meta">
+            Round {{combat.rounds}}
+            &nbsp;|&nbsp;
+            {{summary.enemyCount}} {{#if (eq summary.enemyCount 1)}}enemy{{else}}enemies{{/if}}
+            {{#if combat.date}}&nbsp;|&nbsp; {{combat.date}}{{/if}}
+          </span>
+        </div>
 
-    {{#if hasAwards}}
-    <h3 class="cs-section-title">Awards</h3>
-    <div class="cs-awards">
-      {{#each awards}}
-      <div class="cs-award">
-        <span class="cs-award-icon"><i class="fa-solid {{icon}}"></i></span>
-        <span class="cs-award-label">{{label}}</span>
-        <span class="cs-award-name">{{name}}</span>
-        <span class="cs-award-value">{{value}}</span>
-      </div>
-      {{/each}}
-    </div>
-    {{/if}}
+        {{#if party.length}}
+        <h3 class="cs-section-title">Party</h3>
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th title="Attack rolls made">Atk</th>
+              <th title="Damage confirmations landed">Hits</th>
+              <th title="Attacks that did not result in damage">Miss</th>
+              <th title="Total damage dealt">Dmg Dealt</th>
+              <th title="Average damage per round">Avg/Rnd</th>
+              <th title="Total damage taken">Dmg Taken</th>
+              <th title="Healing provided to others">Healed</th>
+              <th title="Healing received">Recv.Heal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each party}}
+            <tr>
+              <td class="cs-name">{{name}}</td>
+              <td class="cs-num">{{attacksMade}}</td>
+              <td class="cs-num cs-hit">{{hitsLanded}}</td>
+              <td class="cs-num cs-miss">{{misses}}</td>
+              <td class="cs-num cs-dealt">{{damageDealt}}</td>
+              <td class="cs-num cs-avg">{{avgDmgPerRound}}</td>
+              <td class="cs-num cs-taken">{{damageTaken}}</td>
+              <td class="cs-num cs-healed">{{healingDone}}</td>
+              <td class="cs-num">{{healingReceived}}</td>
+            </tr>
+            {{/each}}
+          </tbody>
+        </table>
+        {{/if}}
 
-    <div class="cs-actions">
-      <button data-action="export">
-        <i class="fa-solid fa-file-lines"></i> Export TXT
-      </button>
-    </div>
+        {{#if enemies.length}}
+        <h3 class="cs-section-title">Enemies</h3>
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th title="Number of times hit by the party">Times Hit</th>
+              <th title="Damage taken from party">Dmg Taken</th>
+              <th title="Healing received">Recv.Heal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each enemies}}
+            <tr>
+              <td class="cs-name">{{name}}</td>
+              <td class="cs-num cs-hit">{{timesHit}}</td>
+              <td class="cs-num cs-taken">{{damageTaken}}</td>
+              <td class="cs-num">{{healingReceived}}</td>
+            </tr>
+            {{/each}}
+          </tbody>
+        </table>
+        {{/if}}
+
+        <div class="cs-summary">
+          <div class="cs-summary-item">
+            <span class="cs-label">Total Dmg Dealt</span>
+            <span class="cs-value cs-dealt">{{summary.totalDealt}}</span>
+          </div>
+          <div class="cs-summary-item">
+            <span class="cs-label">Total Dmg Taken</span>
+            <span class="cs-value cs-taken">{{summary.totalTaken}}</span>
+          </div>
+          <div class="cs-summary-item">
+            <span class="cs-label">Total Healing</span>
+            <span class="cs-value cs-healed">{{summary.totalHealing}}</span>
+          </div>
+          <div class="cs-summary-item">
+            <span class="cs-label">Avg Dmg / Enemy</span>
+            <span class="cs-value">{{summary.avgDmgPerEnemy}}</span>
+          </div>
+        </div>
+
+        {{#if hasAwards}}
+        <h3 class="cs-section-title">Combat Awards</h3>
+        <div class="cs-awards">
+          {{#each awards}}
+          <div class="cs-award">
+            <span class="cs-award-icon"><i class="fa-solid {{icon}}"></i></span>
+            <span class="cs-award-label">{{label}}</span>
+            <span class="cs-award-name">{{name}}</span>
+            <span class="cs-award-value">{{value}}</span>
+          </div>
+          {{/each}}
+        </div>
+        {{/if}}
+
+        {{#if hasCrossAwards}}
+        <h3 class="cs-section-title">All-Time Awards</h3>
+        <div class="cs-awards cs-awards-alltime">
+          {{#each crossAwards}}
+          <div class="cs-award">
+            <span class="cs-award-icon"><i class="fa-solid {{icon}}"></i></span>
+            <span class="cs-award-label">{{label}}</span>
+            <span class="cs-award-name">{{name}}</span>
+            <span class="cs-award-value">{{value}}</span>
+          </div>
+          {{/each}}
+        </div>
+        {{/if}}
+
+      </div>{{!-- /cs-main --}}
+    </div>{{!-- /cs-layout --}}
 
   {{else}}
     <p class="cs-empty">No combat data yet. Start a combat to begin tracking.</p>
