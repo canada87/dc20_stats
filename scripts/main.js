@@ -208,28 +208,29 @@ function processConfirmationContent(msg, content) {
 // ── Awards ────────────────────────────────────────────────────────────────────
 
 function computeAwards(all) {
+  const party   = all.filter(a => a.type === 'character' || a.type === 'companion');
   const withPos = (actors, key) => actors.filter(a => (a[key] ?? 0) > 0);
   const topBy   = (list, key)   => list.length ? list.reduce((b, a) => a[key] > b[key] ? a : b) : null;
 
   const awards = [];
 
-  const dps = topBy(withPos(all, 'damageDealt'), 'damageDealt');
+  const dps = topBy(withPos(party, 'damageDealt'), 'damageDealt');
   if (dps) awards.push({ icon: 'fa-fire',           label: 'Top DPS',          name: dps.name,    value: dps.damageDealt });
 
-  const bigHit = topBy(withPos(all, 'maxSingleHit'), 'maxSingleHit');
+  const bigHit = topBy(withPos(party, 'maxSingleHit'), 'maxSingleHit');
   if (bigHit) awards.push({ icon: 'fa-bolt',        label: 'Hardest Hit',      name: bigHit.name, value: bigHit.maxSingleHit });
 
-  const healer = topBy(withPos(all, 'healingDone'), 'healingDone');
+  const healer = topBy(withPos(party, 'healingDone'), 'healingDone');
   if (healer) awards.push({ icon: 'fa-heart',       label: 'Best Healer',      name: healer.name, value: healer.healingDone });
 
-  const hitter = topBy(withPos(all, 'hitsLanded'), 'hitsLanded');
+  const hitter = topBy(withPos(party, 'hitsLanded'), 'hitsLanded');
   if (hitter) awards.push({ icon: 'fa-bullseye',    label: 'Most Hits',        name: hitter.name, value: hitter.hitsLanded });
 
-  const missMap = all.map(a => ({ name: a.name, misses: Math.max(0, a.attacksMade - a.hitsLanded) }));
+  const missMap = party.map(a => ({ name: a.name, misses: Math.max(0, a.attacksMade - a.hitsLanded) }));
   const misser  = topBy(missMap.filter(a => a.misses > 0), 'misses');
   if (misser) awards.push({ icon: 'fa-ban',         label: 'Most Misses',      name: misser.name, value: misser.misses });
 
-  const tanker = topBy(withPos(all, 'damageTaken'), 'damageTaken');
+  const tanker = topBy(withPos(party, 'damageTaken'), 'damageTaken');
   if (tanker) awards.push({ icon: 'fa-shield-halved', label: 'Most Dmg Taken', name: tanker.name, value: tanker.damageTaken });
 
   return awards;
