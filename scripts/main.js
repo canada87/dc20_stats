@@ -88,41 +88,10 @@ function onCreateChatMessage(msg) {
   console.log(`${MODULE_ID} | msg ${msg.id}: isConfirm=${isConfirm}, hasRevertName=${content.includes('revert-name')}`);
   if (!isConfirm) return;
 
-  const parsed = parseConfirmation(content);
-  console.log(`${MODULE_ID} | parsed:`, parsed, '| speaker:', msg.speaker.alias);
-  if (!parsed) return;
-
-  // Target = whoever the confirmation message was sent for (the one who took dmg/healing).
-  const targetActorId = msg.speaker.actor;
-  const targetActor = game.actors.get(targetActorId);
-  if (!targetActor || targetActor.type === 'storage') return;
-
-  // Source = attacker/healer, looked up from Card 1 data, with combat turn as fallback.
-  const pending = pendingAttacks.get(msg.speaker.token);
-  const sourceActorId = pending?.sourceActorId ?? game.combat?.combatant?.actorId;
-  const sourceName    = pending?.sourceName    ?? game.combat?.combatant?.name;
-
-  // Update target.
-  const targetEntry = getOrCreateActor(targetActorId, msg.speaker.alias, targetActor.type);
-  if (parsed.type === 'damage') targetEntry.damageTaken     += parsed.amount;
-  else                          targetEntry.healingReceived += parsed.amount;
-
-  // Update source (only if it exists and isn't storage).
-  let sourceActorEntry = null;
-  if (sourceActorId) {
-    const sourceActor = game.actors.get(sourceActorId);
-    if (sourceActor && sourceActor.type !== 'storage') {
-      sourceActorEntry = getOrCreateActor(sourceActorId, sourceName, sourceActor.type);
-      if (parsed.type === 'damage') sourceActorEntry.damageDealt += parsed.amount;
-      else                          sourceActorEntry.healingDone += parsed.amount;
-    }
-  }
-
-  // Store for potential revert.
-  stats.messageMap[msg.id] = { ...parsed, targetActorId, sourceActorId };
-
-  // Refresh dialog if open.
-  statsDialog?.rendered && statsDialog.render({});
+  // processConfirmationContent handles the rest; renderChatMessage is the primary path
+  // for DC20 which updates message content after creation, but try here too in case
+  // the full content is already present at createChatMessage time.
+  processConfirmationContent(msg, content);
 }
 
 function onDeleteChatMessage(msg) {
@@ -156,18 +125,32 @@ function onUpdateCombat(combat, changed) {
 }
 
 // DC20 creates Card 2 with minimal content then updates it with the full confirmation HTML.
-// We must hook updateChatMessage to catch the revert-name content when it arrives.
+// updateChatMessage may not fire reliably; renderChatMessage fires after every render/re-render
+// and gives us the document with its current (final) content via msg.content.
 function onUpdateChatMessage(msg, changes) {
+  // Diagnostic: log unconditionally to confirm hook fires at all.
+  console.log(`${MODULE_ID} | updateChatMessage ${msg.id}, changeKeys=${Object.keys(changes).join(',')}`);
   if (!stats) return;
-  if (!changes.content) return;
-  if (stats.messageMap[msg.id]) return; // already recorded from createChatMessage
-
-  const content = changes.content;
-  console.log(`${MODULE_ID} | updateChatMessage ${msg.id}: hasRevert=${content.includes('revert-name')}`);
+  if (stats.messageMap[msg.id]) return;
+  const content = changes.content ?? msg.content ?? '';
   if (!isConfirmationMessage(content)) return;
+  processConfirmationContent(msg, content);
+}
 
+// renderChatMessage fires after every render, including after DC20 updates the content.
+// At that point msg.content already holds the final HTML.
+function onRenderChatMessage(msg) {
+  if (!stats) return;
+  if (stats.messageMap[msg.id]) return;
+  const content = msg.content ?? '';
+  console.log(`${MODULE_ID} | renderChatMessage ${msg.id}: hasRevert=${content.includes('revert-name')}`);
+  if (!isConfirmationMessage(content)) return;
+  processConfirmationContent(msg, content);
+}
+
+function processConfirmationContent(msg, content) {
   const parsed = parseConfirmation(content);
-  console.log(`${MODULE_ID} | updateChatMessage parsed:`, parsed, '| speaker:', msg.speaker.alias);
+  console.log(`${MODULE_ID} | processConfirmation parsed:`, parsed, '| speaker:', msg.speaker.alias);
   if (!parsed) return;
 
   const targetActorId = msg.speaker.actor;
@@ -177,6 +160,8 @@ function onUpdateChatMessage(msg, changes) {
   const pending       = pendingAttacks.get(msg.speaker.token);
   const sourceActorId = pending?.sourceActorId ?? game.combat?.combatant?.actorId;
   const sourceName    = pending?.sourceName    ?? game.combat?.combatant?.name;
+
+  console.log(`${MODULE_ID} | processConfirmation: target=${targetActor.name}(${targetActor.type}), source=${sourceName}`);
 
   const targetEntry = getOrCreateActor(targetActorId, msg.speaker.alias, targetActor.type);
   if (parsed.type === 'damage') targetEntry.damageTaken     += parsed.amount;
@@ -328,6 +313,7 @@ Hooks.once('ready', () => {
   Hooks.on('updateCombat',      onUpdateCombat);
   Hooks.on('createChatMessage', onCreateChatMessage);
   Hooks.on('updateChatMessage', onUpdateChatMessage);
+  Hooks.on('renderChatMessage', onRenderChatMessage);
   Hooks.on('deleteChatMessage', onDeleteChatMessage);
 
   // Button in the combat tracker header.
