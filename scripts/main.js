@@ -22,6 +22,21 @@ function saveHistory(combats) {
   game.settings.set(MODULE_ID, 'combatHistory', { combats });
 }
 
+// ── In-progress combat persistence ───────────────────────────────────────────
+// `stats` only lives in memory, so a combat spanning multiple sessions would
+// otherwise lose all progress on logout/reload. Persist it after every update
+// and restore it on `ready` if a combat is already underway.
+
+function saveActiveStats() {
+  if (!game.user.isGM) return;
+  game.settings.set(MODULE_ID, 'activeCombatStats', stats);
+}
+
+function clearActiveStats() {
+  if (!game.user.isGM) return;
+  game.settings.set(MODULE_ID, 'activeCombatStats', null);
+}
+
 // ── Stats helpers ─────────────────────────────────────────────────────────────
 
 function resetStats(combat) {
@@ -94,6 +109,7 @@ function onCreateChatMessage(msg) {
       }
     }
     console.log(`${MODULE_ID} | Card1: attacker=${source.sourceName}, targets=[${targets.join(',')}]`);
+    saveActiveStats();
     return;
   }
 
@@ -127,12 +143,14 @@ function onDeleteChatMessage(msg) {
   }
 
   delete stats.messageMap[msg.id];
+  saveActiveStats();
   statsDialog?.rendered && statsDialog.render({});
 }
 
 function onUpdateCombat(combat, changed) {
   if (!stats || combat.id !== stats.combatId) return;
   if (changed.round !== undefined) stats.rounds = changed.round;
+  saveActiveStats();
 }
 
 function onUpdateChatMessage(msg, changes) {
@@ -187,6 +205,7 @@ function processConfirmationContent(msg, content) {
   }
 
   stats.messageMap[msg.id] = { eventType: 'confirm', ...parsed, targetActorId, sourceActorId };
+  saveActiveStats();
   statsDialog?.rendered && statsDialog.render({});
 }
 
@@ -371,8 +390,34 @@ Hooks.once('ready', () => {
     cachedHistory = Array.isArray(stored?.combats) ? stored.combats : [];
   } catch { cachedHistory = []; }
 
+  game.settings.register(MODULE_ID, 'activeCombatStats', {
+    name: 'Active Combat Stats',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: null,
+  });
+
+  // Restore in-progress tracking if a combat is already underway (e.g. after
+  // a logout/reload mid-combat) instead of behaving as if it never started.
+  try {
+    const activeStored = game.settings.get(MODULE_ID, 'activeCombatStats');
+    if (game.combat) {
+      if (activeStored && activeStored.combatId === game.combat.id) {
+        stats = activeStored;
+        pendingAttacks.clear();
+        console.log(`${MODULE_ID} | restored in-progress combat tracking for combat ${game.combat.id}`);
+      } else if (game.combat.started ?? game.combat.round > 0) {
+        resetStats(game.combat);
+        saveActiveStats();
+        console.log(`${MODULE_ID} | combat already in progress with no saved stats, started fresh tracking`);
+      }
+    }
+  } catch (err) { console.error(`${MODULE_ID} | failed to restore active combat stats`, err); }
+
   Hooks.on('combatStart', combat => {
     resetStats(combat);
+    saveActiveStats();
     ui.notifications.info('DC20 Stats: tracking started.');
   });
 
@@ -382,6 +427,7 @@ Hooks.once('ready', () => {
     delete record.messageMap;
     saveHistory([record, ...cachedHistory].slice(0, 30));
     stats = null;
+    clearActiveStats();
     selectedCombatListIdx = 0;
     // Only open automatically for the GM.
     if (game.user.isGM) openStatsDialog();
