@@ -2,10 +2,10 @@
   "id": "dc20_stats",
   "title": "DC20 Combat Statistics",
   "description": "Tracks per-actor damage and healing statistics during combat for the DC20 RPG system.",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "compatibility": {
     "minimum": "11",
-    "verified": "13"
+    "verified": "14"
   },
   "authors": [
     {
@@ -15,7 +15,7 @@
   ],
   "url": "https://github.com/canada87/dc20_stats",
   "manifest": "https://raw.githubusercontent.com/canada87/dc20_stats/main/module.json",
-  "download": "https://github.com/canada87/dc20_stats/releases/download/v1.3.2/dc20_stats.zip",
+  "download": "https://github.com/canada87/dc20_stats/releases/download/v1.3.3/dc20_stats.zip",
   "changelog": "https://github.com/canada87/dc20_stats/releases",
   "esmodules": [
     "scripts/main.js"
